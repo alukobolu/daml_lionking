@@ -1,0 +1,53 @@
+module Main where
+
+import Daml.Script
+
+type KingdomId = ContractId Kingdom
+
+template Kingdom
+  with
+    currentKing : Party -- apperently Party is a variable type like text and so on , its a variable type for users
+    futureKing  : Party
+    kingdomName   : Text
+  where
+    ensure kingdomName /= ""
+    signatory currentKing
+    observer futureKing
+    choice Give : KingdomId
+      with
+        successor : Party
+      controller futureKing
+      do create this with
+          currentKing = futureKing
+          futureKing = successor
+           
+
+setup : Script KingdomId-- for some reason whatever is returned in setup below return into this statement
+setup = script do
+-- user_setup_begin
+  mufasa <- allocatePartyWithHint "Mufasa" (PartyIdHint "Mufasa") 
+  simba <- allocatePartyWithHint "Simba" (PartyIdHint "Simba")
+  scar <- allocatePartyWithHint "Scar" (PartyIdHint "Scar")
+  mufasaId <- validateUserId "mufasa" 
+  simbaId <- validateUserId "simba"
+  scarId <- validateUserId "scar"
+  createUser (User mufasaId (Some mufasa)) [CanActAs mufasa] 
+  createUser (User simbaId (Some simba)) [CanActAs simba]
+  createUser (User scarId (Some scar)) [CanActAs scar]
+-- user_setup_end
+
+  mufasaKingdom <- submit mufasa do 
+    createCmd Kingdom with
+      currentKing = mufasa
+      futureKing = mufasa
+      kingdomName = "Everything the light touches"
+
+  simbaKingdom <- submit mufasa do
+    exerciseCmd mufasaKingdom Give with successor = simba 
+
+  scarKingdom <- submit simba do
+    exerciseCmd simbaKingdom Give with successor = scar 
+
+  submit scar do
+    exerciseCmd scarKingdom Give with successor = simba 
+

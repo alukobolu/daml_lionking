@@ -1,0 +1,46 @@
+module Example where
+
+import Daml.Script
+
+type AssetId = ContractId Asset {-- Asset is the variable name like the object , etc Land , or Cash and the AssetId is the id of the object so it could be LandId or CashId --}
+--  Note it should always start with capital letters 
+template Asset
+  with
+    issuer : Party -- apperently Party is a variable type like text and so on , its a variable type for users
+    owner  : Party
+    name   : Text
+  where
+    ensure name /= ""
+    signatory issuer
+    observer owner
+    choice Give : AssetId
+      with
+        newOwner : Party
+      controller owner
+      do create this with
+           owner = newOwner
+
+setup : Script AssetId -- for some reason whatever is returned in setup below return into this statement
+setup = script do
+-- user_setup_begin
+  alice <- allocatePartyWithHint "Alice" (PartyIdHint "Alice") -- set alice as  a party, display :"Alice" , variable : alice
+  bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob") -- set bob as  a party, display :"Bob" , variable : bob
+  aliceId <- validateUserId "alice" -- create alice as a userId
+  bobId <- validateUserId "bob"
+  createUser (User aliceId (Some alice)) [CanActAs alice] -- create alice as a user in database i guess
+  createUser (User bobId (Some bob)) [CanActAs bob]
+-- user_setup_end
+
+  aliceTV <- submit alice do -- alice create "TV" as an asset (the template contract above) names the variable as aliceTV
+    createCmd Asset with
+      issuer = alice
+      owner = alice
+      name = "TV"
+
+  bobTV <- submit alice do
+    exerciseCmd aliceTV Give with newOwner = bob -- alice gives "TV" to bob changing the variable to bobTV
+
+  submit bob do
+    exerciseCmd bobTV Give with newOwner = alice {- bob gives "TV" to alice without assigning to a variable therefore it returns out of the script, 
+    if it was assigned a variable there would be an error because of no return value -}
+
